@@ -1,169 +1,113 @@
-const express =require('express')
-const cors =require('cors')
-const app =express()
-const port =process.env.PORT || 5000
+const express = require("express");
+const cors = require("cors");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
-//middleware 
+const app = express();
+const port = process.env.PORT || 5000;
 
-app.use(cors())
-app.use(express.json())
+// Middleware
+app.use(cors());
+app.use(express.json());
 
+const uri =
+  "mongodb+srv://shakibhasan1070:4TePn1tCGPyf7sdK@cluster0.n6dx8hf.mongodb.net/?retryWrites=true&w=majority";
 
-
-
-
-const { MongoClient, ServerApiVersion } = require('mongodb');
-const uri = "mongodb+srv://shakibhasan1070:4TePn1tCGPyf7sdK@cluster0.n6dx8hf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
-
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+// MongoDB Client
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+    const database = client.db("CUCC");
+    const membersCollection = database.collection("members");
 
+    // GET all members
+    app.get("/members", async (req, res) => {
+      try {
+        const members = await membersCollection.find().toArray();
+        res.json(members);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
 
+    // POST → add new member
+    app.post("/members", async (req, res) => {
+      const member = req.body;
 
-    const database =client.db('CUCC');
-    const membersCollection =database.collection('members');
+      try {
+        const existing = await membersCollection.findOne({ id: member.id });
+        if (existing) {
+          return res.status(400).json({ error: "This ID is already registered" });
+        }
 
+        const result = await membersCollection.insertOne(member);
+        res.status(201).json({ success: true, result });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
 
-    app.post('/members',async(req,res)=>{
-    const member = req.body;
-    console.log( member); 
-    const result = await membersCollection.insertOne(member);
-    res.send(result);
-    
-    })
+    // DELETE → delete member
+    app.delete("/members/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await membersCollection.deleteOne({ _id: new ObjectId(id) });
 
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ error: "Member not found" });
+        }
 
-    app.get('/members',async(req,res)=>{
-        const cursor = membersCollection.find()
-        const result = await cursor.toArray()
-        res.send(result)  
-    })
+        res.json({ success: true });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
 
+    // PUT → update member
+    app.put("/members/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedMember = { ...req.body };
+        delete updatedMember._id; // remove _id to prevent MongoDB error
 
-    // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        const result = await membersCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedMember }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ error: "Member not found" });
+        }
+
+        res.json({ success: true });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
+
+    console.log("✅ MongoDB connected and server is ready!");
   } finally {
-    // Ensures that the client will close when you finish/error
-    //await client.close();
+    // Connection remains open
   }
 }
 run().catch(console.dir);
 
+// Root route
+app.get("/", (req, res) => {
+  res.send("CUCC Server is running");
+});
 
-
-
-app.get('/',(req,res)=>{
-    res.send('This is cucc server')
-})
-
-app.listen(port,()=>{
-    console.log(`Cucc server is running on port ${port}`);
-})
-
-
-
-
- 
-
-
-
-
-
-
-
-
-
-//
-/*
-const [formData, setFormData] = useState({
-    name: "",
-    id: "",
-    batch: "",
-    section: "",
-    yearSemester: "",
-    dateOfBirth: "",
-    gender: "",
-    shift: "",
-    bloodGroup: "",
-    religion: "",
-    mobile: "",
-    whatsapp: "",
-    presentAddress: "",
-    permanentAddress: "",
-    emergencyContact: "",
-    email: "",
-    fieldOfInterest: [],
-    technicalSkills: [],
-    extraCurricular: [],
-    otherField: "",
-    otherSkill: "",
-    otherActivity: "",
-  });
-
-  const [showOtherField, setShowOtherField] = useState(false);
-  const [showOtherSkill, setShowOtherSkill] = useState(false);
-  const [showOtherActivity, setShowOtherActivity] = useState(false);
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleCheckbox = (e, field) => {
-    const { value, checked } = e.target;
-    setFormData((prev) => {
-      const updated = checked
-        ? [...prev[field], value]
-        : prev[field].filter((v) => v !== value);
-      return { ...prev, [field]: updated };
-    });
-
-    if (field === "fieldOfInterest" && value === "Others") {
-      setShowOtherField(checked);
-    }
-    if (field === "technicalSkills" && value === "Others") {
-      setShowOtherSkill(checked);
-    }
-    if (field === "extraCurricular" && value === "Others") {
-      setShowOtherActivity(checked);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const res = await fetch("http://localhost:5000/api/members", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        alert("Form submitted successfully!");
-      } else {
-        alert("Failed to submit form.");
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Error submitting form.");
-    }
-  };
-
-*/
-
-
-
-
-
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+});
